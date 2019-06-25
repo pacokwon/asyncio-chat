@@ -62,7 +62,11 @@
         }
 
         .center {
-            text-align: center
+            text-align: center;
+        }
+
+        .enter {
+            background-color: #FF9588;            
         }
     </style>
 
@@ -129,6 +133,7 @@
         time.appendChild(document.createTextNode(element.timestamp));
         
         if (element.content === '') {
+            chatboxChild.classList.add('enter');
             username.classList.add('center');
             time.classList.add('center');
         }
