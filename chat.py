@@ -1,16 +1,15 @@
 from aiohttp import web
 from aiohttp_session import get_session, redis_storage, setup
 from random_username.generate import generate_username
+from urllib.parse import parse_qs
 
 import aiofiles
 import aiohttp
-import aiohttp_session
 import aioredis
 import asyncio
 import asyncpg
 import json
 import time
-from urllib.parse import parse_qs
 
 routes = web.RouteTableDef()
 
@@ -70,14 +69,13 @@ async def ws(request):
                     'content': json_msg['content'],
                     'timestamp': time.time()
                 }
-
-                await conn.execute(f'''INSERT INTO log VALUES ('{document['username']}', '{document['content']}', '{document['timestamp']}')''')
                 for _ws in request.app['websockets']:
                     await _ws.send_json(document)
+
+                await conn.execute(f'''INSERT INTO log VALUES ('{document['username']}', '{document['content']}', '{document['timestamp']}')''')
             
             elif json_msg['type'] == 'close':
                 await ws.close()
-                print('hello!!!')
         elif msg.type == aiohttp.WSMsgType.ERROR:
             print(ws.exception())
 
@@ -89,10 +87,10 @@ async def ws(request):
         'content': '',
         'timestamp': time.time()
     }
-    await conn.execute(f'''INSERT INTO log VALUES ('{exit_document['username']}', '', '{exit_document['timestamp']}')''')
-
     for _ws in request.app['websockets']:
-        _ws.send_json(exit_document)
+        await _ws.send_json(exit_document)
+
+    await conn.execute(f'''INSERT INTO log VALUES ('{exit_document['username']}', '', '{exit_document['timestamp']}')''')
 
     return ws
 
@@ -103,7 +101,7 @@ async def main():
     app['websockets'] = []
 
     redis_pool = await aioredis.create_pool('redis://localhost')
-    storage = redis_storage.RedisStorage(redis_pool)
+    storage = redis_storage.RedisStorage(redis_pool, max_age=600)
     app['redis_pool'] = redis_pool
 
     conn = await asyncpg.connect(user='pacokwon', database='chat', host='127.0.0.1')
@@ -123,7 +121,7 @@ async def main():
         await conn.close()
         
 
-    aiohttp_session.setup(app, storage)
+    setup(app, storage)
     app.on_cleanup.append(dispose_redis_pool)
 
     app.add_routes(routes)

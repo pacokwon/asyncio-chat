@@ -142,7 +142,7 @@
 
     function tweakHistoryElement(e) {
         const date = new Date(e.timestamp * 1000);
-        e.timestamp = `${date.getHours() < 10 ? 0 : ''}${date.getHours()}:${date.getSeconds() < 10 ? 0 : ''}${date.getSeconds()}`
+        e.timestamp = `${date.getHours() < 10 ? 0 : ''}${date.getHours()}:${date.getMinutes() < 10 ? 0 : ''}${date.getMinutes()}`
 
         return e;
     }
@@ -197,6 +197,11 @@
         sock.send(JSON.stringify({'type': 'msg', content}));
 
         $('input:text').val('');
+    }
+    
+    window.onbeforeunload = () => {
+        sock.send(JSON.stringify({'type': 'close'}));
+
     }
 
     document.getElementById('submit-button').addEventListener('click', sendPost);
