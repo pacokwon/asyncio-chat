@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ChitChat</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <style>
+        .chatbox {
+            border: 2px solid #f1f1f1;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            padding: 10px 20px;
+            margin: 10px 0;
+        }
+
+        .me {
+            border-color: #cbf4ff;
+            background-color: #cbf4ff;
+            text-align: right
+        }
+
+        .chatbox::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+
+        .time-right {
+            float: right;
+            color: #aaa;
+        }
+
+        .time-left {
+            float: left;
+            color: #999;
+        }
+
+        div.username {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        div.time {
+            font-size: small;
+            color: #737373;
+            margin-top: 5px;
+        }
+
+        .scroll {
+            height: 100%;
+            overflow: scroll
+        }
+
+        .container-height {
+            height: 1000px
+        }
+
+        .card-height {
+            margin-top: 30px;
+            height: 100%;
+        }
+
+        .center {
+            text-align: center
+        }
+    </style>
+
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="navbar-brand">
+            ChitChat
+        </div>
+    </nav>
+    <div class="container container-height">
+        <div class="card card-height">
+            <div class="card-header text-center">
+                ChitChat
+            </div>
+            <div class="card-body scroll" id="chatbox">
+                <!-- textboxes appended here -->
+            </div>
+            <div class="card-footer" style="display: flex;">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="Start ChitChatting!" id="chat-content"/>
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" type="submit" id="submit-button">
+                            <span class="fa fa-send"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    function cookieObject() {
+        return document.cookie
+            .split(';')
+            .reduce((res, c) => {
+                const [key, val] = c.trim().split('=').map(decodeURIComponent)
+                try {
+                    return Object.assign(res, { [key]: JSON.parse(val) })
+                } catch (e) {
+                    return Object.assign(res, { [key]: val })
+                }
+            }, {});
+    }
+
+    function generateChatboxChild(element) {
+        let chatboxChild = document.createElement('div');
+
+        chatboxChild.classList.add('chatbox');
+        chatboxChild.classList.add('card-text');
+        if (cookieObject()['username'] === element.username) {
+            chatboxChild.classList.add('me');
+        }
+
+        let username = document.createElement('div');
+        username.classList.add('username');
+        username.appendChild(document.createTextNode(element.username));
+        
+        let content = document.createElement('div');
+        content.appendChild(document.createTextNode(element.content));
+        
+        let time = document.createElement('div');
+        time.classList.add('time');
+        time.appendChild(document.createTextNode(element.timestamp));
+        
+        if (element.content === '') {
+            username.classList.add('center');
+            time.classList.add('center');
+        }
+
+        chatboxChild.appendChild(username);
+        chatboxChild.appendChild(content);
+        chatboxChild.appendChild(time);
+
+        return chatboxChild;
+    }
+
+    function tweakHistoryElement(e) {
+        const date = new Date(e.timestamp * 1000);
+        e.timestamp = `${date.getHours() < 10 ? 0 : ''}${date.getHours()}:${date.getSeconds() < 10 ? 0 : ''}${date.getSeconds()}`
+
+        return e;
+    }
+
+    document.getElementById('chat-content').placeholder = 'Username: ' + cookieObject()['username'];
+
+    let sock = new WebSocket('ws://' + window.location.host + '/ws');
+    let history = [];
+
+    sock.onopen = () => {
+        sock.send(JSON.stringify({ 'type': 'history' }))
+    }
+
+    sock.onmessage = event => {
+        const data = JSON.parse(event.data);
+        console.log(data)
+
+        if (data['type'] === 'history') {
+            console.log(data['history'])
+            history = data['history'].map(tweakHistoryElement);
+
+            let chatbox = document.getElementById('chatbox')
+
+            history.forEach(e => {
+                chatbox.appendChild(generateChatboxChild(e))
+            })
+
+            chatbox.scrollTop = chatbox.scrollHeight;
+        } else if (data['type'] === 'notification' || data['type'] === 'msg') {
+            const tweakedData = tweakHistoryElement(data)
+            
+            history.push(tweakedData);
+            
+            let chatbox = document.getElementById('chatbox');
+            chatbox.appendChild(generateChatboxChild(tweakedData));
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+    }
+
+    sock.onclose = event => {
+        console.log('closed now');
+        sock.send(JSON.stringify({'type': 'close'}))
+    }
+
+
+    function sendPost() {
+        if (sock.readyState !== 1) return;
+
+        const content = $('input:text').val()
+        if (content === '') return;
+
+        sock.send(JSON.stringify({'type': 'msg', content}));
+
+        $('input:text').val('');
+    }
+
+    document.getElementById('submit-button').addEventListener('click', sendPost);
+    document.getElementById('chat-content').addEventListener('keypress', event => {
+        if (event.keyCode === 13) {
+            event.preventDefault();
+
+            sendPost();
+        }
+    })
+
+</script>
+
+</html>
