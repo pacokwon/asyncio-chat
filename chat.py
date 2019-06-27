@@ -22,7 +22,14 @@ async def home(request):
 
     async with aiofiles.open('./views/index.html', mode='r') as f:
         contents = await f.read()
-        return web.Response(text=contents, content_type='text/html', headers={'Set-Cookie': f"username={session['username']}"})
+        return web.Response(text=contents, content_type='text/html')
+
+
+@routes.get('/username')
+async def username(request):
+    username = (await get_session(request))['username']
+
+    return web.json_response({'username': username})
 
 
 @routes.get('/ws')

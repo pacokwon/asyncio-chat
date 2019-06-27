@@ -100,25 +100,19 @@
     </div>
 </body>
 <script>
-    function cookieObject() {
-        return document.cookie
-            .split(';')
-            .reduce((res, c) => {
-                const [key, val] = c.trim().split('=').map(decodeURIComponent)
-                try {
-                    return Object.assign(res, { [key]: JSON.parse(val) })
-                } catch (e) {
-                    return Object.assign(res, { [key]: val })
-                }
-            }, {});
-    }
+    let userid = ''
+    $.get('/username', data => {
+        console.log(data) 
+        userid = data['username'];
+        document.getElementById('chat-content').placeholder = `Username: ${userid}`;
+    })
 
     function generateChatboxChild(element) {
         let chatboxChild = document.createElement('div');
 
         chatboxChild.classList.add('chatbox');
         chatboxChild.classList.add('card-text');
-        if (cookieObject()['username'] === element.username) {
+        if (userid === element.username) {
             chatboxChild.classList.add('me');
         }
 
@@ -153,7 +147,6 @@
         return e;
     }
 
-    document.getElementById('chat-content').placeholder = 'Username: ' + cookieObject()['username'];
 
     let sock = new WebSocket('ws://' + window.location.host + '/ws');
     let history = [];
